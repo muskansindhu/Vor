@@ -1,3 +1,5 @@
+import os
+
 
 class Config:
     STAY_RADIUS_M = 75.0
@@ -10,12 +12,12 @@ class Config:
     GPS_GAP_HOURS = 2
 
     REPEAT_SERVICE_CATEGORIES = [
-    "home_cleaning",
-    "salon_at_home",
-    "massage_therapy",
-    "ac_servicing",
-    "plumbing",
-    "electrical",
+        "home_cleaning",
+        "salon_at_home",
+        "massage_therapy",
+        "ac_servicing",
+        "plumbing",
+        "electrical",
     ]
 
     REPEAT_CATEGORY_WINDOWS = {
@@ -28,16 +30,19 @@ class Config:
     }
 
     RISK_WEIGHTS = {
-    "repeat_window": 3,
-    "unmatched_near_past": 3,
-    "repeated_unmatched": 5,
-    "long_duration": 2,
-    "multiple_customers": 4,
-    "gps_gap": 2,
-    "spoofing": 4,
-    "normal_area": -2,
+        "repeat_window": 3,
+        "unmatched_near_past": 3,
+        "repeated_unmatched": 5,
+        "long_duration": 2,
+        "multiple_customers": 4,
+        "gps_gap": 2,
+        "spoofing": 4,
+        "normal_area": -2,
     }
 
     ONE_TIME_CATEGORIES = ["pest_control", "sofa_cleaning", "appliance_install"]
 
-    
+    KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    KAFKA_PINGS_TOPIC = os.getenv("KAFKA_PINGS_TOPIC", "gps-pings")
+    KAFKA_CONSUMER_GROUP = os.getenv("KAFKA_CONSUMER_GROUP", "vor-processing")
+    KAFKA_ALERTS_TOPIC = os.getenv("KAFKA_ALERTS_TOPIC", "suspicious-visits")

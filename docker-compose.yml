@@ -1,0 +1,95 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: vor-zookeeper
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: vor-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  gps-ingest-service:
+    build:
+      context: .
+      dockerfile: gps-ingest-service/Dockerfile
+    container_name: vor-gps-ingest-service
+    ports:
+      - "8001:8000"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_PINGS_TOPIC=gps-pings
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  processing-service:
+    build:
+      context: .
+      dockerfile: processing-service/Dockerfile
+    container_name: vor-processing-service
+    ports:
+      - "8002:8000"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_PINGS_TOPIC=gps-pings
+      - KAFKA_CONSUMER_GROUP=vor-processing
+      - KAFKA_ALERTS_TOPIC=suspicious-visits
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  alert-service:
+    build:
+      context: .
+      dockerfile: alert-service/Dockerfile
+    container_name: vor-alert-service
+    ports:
+      - "8003:8000"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_ALERTS_TOPIC=suspicious-visits
+      - KAFKA_ALERTS_CONSUMER_GROUP=vor-alert-service
+      - ALERT_BUFFER_SIZE=1000
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  location-simulator-service:
+    build:
+      context: .
+      dockerfile: location-simulator-service/Dockerfile
+    container_name: vor-location-simulator-service
+    environment:
+      - INGEST_URL=http://gps-ingest-service:8000/locations
+      - PING_INTERVAL_SECONDS=5
+      - REQUEST_TIMEOUT_SECONDS=5
+    depends_on:
+      gps-ingest-service:
+        condition: service_started
+      processing-service:
+        condition: service_started

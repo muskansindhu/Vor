@@ -66,3 +66,56 @@ def seed_db(
         db.commit()
     finally:
         db.close()
+
+
+def ensure_simulation_reference_booking(days_ago: int = 10) -> None:
+    """
+    Ensure a deterministic repeatable booking exists so simulator traffic can
+    reliably trigger suspicious-visit flows.
+    """
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        completed = now - timedelta(days=days_ago)
+        scheduled = completed - timedelta(hours=1)
+
+        professional_id = "SIM_PRO"
+        customer_id = "SIM_CUST"
+        booking_id = "B_SIM_REFERENCE"
+
+        prof = db.get(Professional, professional_id)
+        if prof is None:
+            db.add(Professional(professional_id=professional_id, name="Simulator Professional"))
+
+        customer = db.get(Customer, customer_id)
+        if customer is None:
+            db.add(Customer(customer_id=customer_id, name="Simulator Customer"))
+
+        booking = db.get(Booking, booking_id)
+        if booking is None:
+            db.add(
+                Booking(
+                    booking_id=booking_id,
+                    professional_id=professional_id,
+                    customer_id=customer_id,
+                    category="home_cleaning",
+                    service_latitude=28.6139,
+                    service_longitude=77.2090,
+                    scheduled_time=scheduled,
+                    completed_time=completed,
+                    status="completed",
+                )
+            )
+        else:
+            booking.professional_id = professional_id
+            booking.customer_id = customer_id
+            booking.category = "home_cleaning"
+            booking.service_latitude = 28.6139
+            booking.service_longitude = 77.2090
+            booking.scheduled_time = scheduled
+            booking.completed_time = completed
+            booking.status = "completed"
+
+        db.commit()
+    finally:
+        db.close()

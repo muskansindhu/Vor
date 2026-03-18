@@ -2,8 +2,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from shared.config import Config
-from shared.db import SessionLocal, init_db
-from shared.seed import seed_db
+from shared.db import SessionLocal
 from shared.geo import cluster_key, haversine_m
 from shared.models import Professional, Stay
 
@@ -20,7 +19,7 @@ class ProcessingPipeline:
         self._gps_gap_flag: Dict[str, bool] = {}
         self._home_counts: Dict[str, Dict[str, int]] = {}
 
-    async def _handle_ping(self, ping_data: dict) -> None:
+    async def _handle_ping(self, ping_data: dict) -> Optional[dict]:
         professional_id = ping_data["professional_id"]
         ts_raw = ping_data["timestamp"]
         if isinstance(ts_raw, (int, float)):
@@ -45,11 +44,11 @@ class ProcessingPipeline:
 
         completed = self._detector.update(professional_id, ts, lat, lon)
         if completed is None:
-            return
+            return None
 
         duration_min = (completed.last_time - completed.start_time).total_seconds() / 60.0
         if duration_min < Config.STAY_MIN_MINUTES:
-            return
+            return None
 
         home_cluster_key = self._get_home_cluster(professional_id)
         stay_cluster = cluster_key(completed.lat, completed.lon)
@@ -87,7 +86,7 @@ class ProcessingPipeline:
             )
             if matched:
                 db.commit()
-                return
+                return None
 
             reference = analyzer.find_reference_booking(
                 professional_id,
@@ -97,15 +96,15 @@ class ProcessingPipeline:
             )
             if reference is None:
                 db.commit()
-                return
+                return None
 
             if not analyzer.within_repeat_window(reference, completed.start_time):
                 db.commit()
-                return
+                return None
 
             if home_cluster_key and home_cluster_key == stay_cluster:
                 db.commit()
-                return
+                return None
 
             scorer = RiskScorer(db)
             alert = scorer.score(
@@ -124,9 +123,27 @@ class ProcessingPipeline:
             )
             db.add(alert)
             db.commit()
+            db.refresh(alert)
+            return {
+                "id": alert.id,
+                "professional_id": alert.professional_id,
+                "customer_id": alert.customer_id,
+                "reference_booking_id": alert.reference_booking_id,
+                "category": alert.category,
+                "suspicious_visit_time": alert.suspicious_visit_time.isoformat(),
+                "visit_latitude": alert.visit_latitude,
+                "visit_longitude": alert.visit_longitude,
+                "visit_duration_minutes": alert.visit_duration_minutes,
+                "risk_score": alert.risk_score,
+                "flagged": alert.flagged,
+                "reason": alert.reason,
+                "cluster_key": alert.cluster_key,
+                "created_at": alert.created_at.isoformat() if alert.created_at else None,
+            }
 
         finally:
             db.close()
+        return None
 
     def _update_flags(self, professional_id: str, ts: datetime, lat: float, lon: float) -> None:
         prev = self._last_ping.get(professional_id)
