@@ -3,8 +3,13 @@
 Vor is named after the Norse goddess associated with wisdom and careful inquiry.
 Here, Vor stands for **Verification of Off-platform Return**.
 
-Vor is a background investigator for field activity.
-A location ping comes in, Vor follows it through a chain of checks, and if the pattern looks like an off-platform revisit, Vor raises an alert.
+Vor is a risk-detection system for service marketplaces where bookings start on-platform but sometimes continue off-platform after completion.
+That behavior creates real product and business pain: revenue leakage, weaker trust and safety controls, and poor visibility for operations teams handling disputes.
+
+The hard part is signal quality. Raw GPS traces are noisy and, on their own, are rarely enough to support confident action.
+Vor solves this by turning location streams into explainable evidence: it detects meaningful stays, compares them against booking history and expected repeat windows, applies integrity checks like spoofing/gap patterns, and computes a weighted risk score.
+
+Instead of forcing teams to manually inspect raw movement data, Vor outputs prioritized suspicious-visit alerts that are easier to review, triage, and investigate.
 
 ![Vor demo](assets/vor-demo.gif)
 
